@@ -8,6 +8,7 @@
     "build": "rollup -c",
     "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.lucaslosi.paseo-status\"",
     "typecheck": "tsc --noEmit",
+    "preview:svg": "tsx scripts/preview-svg.ts",
     "validate": "streamdeck validate com.lucaslosi.paseo-status.sdPlugin",
     "pack": "npm run build && streamdeck pack com.lucaslosi.paseo-status.sdPlugin -f",
     "link": "npm run build && streamdeck link com.lucaslosi.paseo-status.sdPlugin"
@@ -23,6 +24,7 @@
     "@types/ws": "^8.18.1",
     "rollup": "^4.32.1",
     "tslib": "^2.8.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   },
   "dependencies": {
