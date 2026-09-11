@@ -29,7 +29,10 @@ export class StatusKeyAction extends SingletonAction {
 	override async onKeyDown(_ev: KeyDownEvent): Promise<void> {
 		await monitor.acknowledge();
 		await this.renderAll(monitor.getStatus());
-		focusOrLaunchPaseo(getGlobalSettings().paseoPath);
+		focusOrLaunchPaseo(getGlobalSettings().paseoPath, {
+			debug: (message) => streamDeck.logger.debug(message),
+			warn: (message) => streamDeck.logger.warn(message),
+		});
 	}
 
 	async renderAll(status: PaseoStatus): Promise<void> {
