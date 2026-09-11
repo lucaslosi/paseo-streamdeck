@@ -2,7 +2,6 @@ import type { PaseoStatus } from "../paseo/state.js";
 
 const SIZE = 72;
 const CARD = { x: 1, y: 1, size: 70, radius: 12 };
-const CHIP = { x: 7, size: 22, radius: 7 };
 
 // Paseo's own status palette (favicon + status-dot colors).
 const COLORS = {
@@ -17,6 +16,8 @@ const COLORS = {
 const FONT = "Segoe UI, SF Pro Display, Helvetica Neue, Arial, sans-serif";
 const NUMBER_SIZE = 21;
 
+const ROW_CENTERS = [16, 36, 56] as const;
+
 export function renderStatusImage(status: PaseoStatus): string {
 	const svg = status.connection === "connected" ? renderConnected(status) : renderDisconnected(status);
 	return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
@@ -27,9 +28,9 @@ function renderConnected(status: PaseoStatus): string {
 	const borderColor = status.attention > 0 ? attentionColor : COLORS.border;
 
 	const rows: Array<{ centerY: number; color: string; count: number; icon: IconKind }> = [
-		{ centerY: 18, color: COLORS.running, count: status.running, icon: "running" },
-		{ centerY: 36, color: attentionColor, count: status.attention, icon: "attention" },
-		{ centerY: 54, color: COLORS.done, count: status.done, icon: "done" },
+		{ centerY: ROW_CENTERS[0], color: COLORS.running, count: status.running, icon: "running" },
+		{ centerY: ROW_CENTERS[1], color: attentionColor, count: status.attention, icon: "attention" },
+		{ centerY: ROW_CENTERS[2], color: COLORS.done, count: status.done, icon: "done" },
 	];
 
 	const rowMarkup = rows
@@ -37,13 +38,15 @@ function renderConnected(status: PaseoStatus): string {
 			const opacity = row.count === 0 ? 0.22 : 1;
 			return (
 				`<g opacity="${opacity}">` +
-				`<rect x="${CHIP.x}" y="${row.centerY - CHIP.size / 2}" width="${CHIP.size}" height="${CHIP.size}" rx="${CHIP.radius}"` +
-				` fill="${row.color}" fill-opacity="0.16" stroke="${row.color}" stroke-opacity="0.38" stroke-width="1"/>` +
-				icon(row.icon, 18, row.centerY, row.color) +
+				icon(row.icon, 17, row.centerY, row.color) +
 				`<text x="61" y="${textBaseline(row.centerY)}" text-anchor="end" font-family="${FONT}" font-size="${NUMBER_SIZE}" font-weight="700" fill="${row.color}">${row.count}</text>` +
 				`</g>`
 			);
 		})
+		.join("");
+
+	const dividerMarkup = [ROW_CENTERS[0] + 10, ROW_CENTERS[1] + 10]
+		.map((y) => `<line x1="10" y1="${y}" x2="62" y2="${y}" stroke="#ffffff" stroke-opacity="0.07" stroke-width="1"/>`)
 		.join("");
 
 	const unreachableDot =
@@ -58,6 +61,7 @@ function renderConnected(status: PaseoStatus): string {
 			`<rect x="${CARD.x}" y="${CARD.y}" width="${CARD.size}" height="${CARD.size}" rx="${CARD.radius}" fill="url(#card)"/>` +
 			`<rect x="${CARD.x}" y="${CARD.y}" width="${CARD.size}" height="${CARD.size}" rx="${CARD.radius}" fill="url(#sheen)"/>` +
 			rowMarkup +
+			dividerMarkup +
 			unreachableDot +
 			`<rect x="${CARD.x}" y="${CARD.y}" width="${CARD.size}" height="${CARD.size}" rx="${CARD.radius}" fill="none" stroke="${borderColor}" stroke-width="1.6"/>`,
 	);
@@ -90,18 +94,19 @@ function renderDisconnected(status: PaseoStatus): string {
 type IconKind = "running" | "attention" | "done";
 
 function icon(kind: IconKind, centerX: number, centerY: number, color: string): string {
+	const scale = 1.05;
 	if (kind === "running") {
-		return `<path d="M${centerX - 4.5} ${centerY - 5.2} L${centerX + 5} ${centerY} L${centerX - 4.5} ${centerY + 5.2} Z" fill="${color}" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>`;
+		return `<path d="M${centerX - 4.2 * scale} ${centerY - 4.9 * scale} L${centerX + 4.7 * scale} ${centerY} L${centerX - 4.2 * scale} ${centerY + 4.9 * scale} Z" fill="${color}" stroke="${color}" stroke-width="${1.3 * scale}" stroke-linejoin="round"/>`;
 	}
 
 	if (kind === "attention") {
 		return (
-			`<rect x="${centerX - 1.2}" y="${centerY - 6.3}" width="2.4" height="8.2" rx="1.2" fill="${color}"/>` +
-			`<circle cx="${centerX}" cy="${centerY + 5.2}" r="1.5" fill="${color}"/>`
+			`<rect x="${centerX - 1.1 * scale}" y="${centerY - 5.9 * scale}" width="${2.2 * scale}" height="${7.6 * scale}" rx="${1.1 * scale}" fill="${color}"/>` +
+			`<circle cx="${centerX}" cy="${centerY + 4.8 * scale}" r="${1.4 * scale}" fill="${color}"/>`
 		);
 	}
 
-	return `<path d="M${centerX - 4.2} ${centerY} l2.6 2.6 l5.6 -6.1" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+	return `<path d="M${centerX - 3.9 * scale} ${centerY} l${2.4 * scale} ${2.4 * scale} l${5.2 * scale} ${-5.6 * scale}" fill="none" stroke="${color}" stroke-width="${2.3 * scale}" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
 
 /** SVG `y` of a text baseline so digits optically center on `centerY`. */
