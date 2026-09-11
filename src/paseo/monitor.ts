@@ -166,7 +166,7 @@ export class PaseoMonitor {
 			url: target.url,
 			clientId: `paseo-streamdeck-${Math.random().toString(36).slice(2, 10)}`,
 			clientType: "browser",
-			appVersion: "0.2.0",
+			appVersion: "0.3.0",
 			password: target.password,
 			webSocketFactory: (url) => new WebSocket(url) as unknown as WebSocketLike,
 			reconnect: { enabled: true, baseDelayMs: 1_000, maxDelayMs: 15_000 },

@@ -4,9 +4,11 @@ A Stream Deck plugin that shows live [Paseo](https://paseo.sh) agent status on a
 
 | Row | Color | Meaning |
 | --- | --- | --- |
-| ▶ | green | agents running |
+| ▶ | blue | agents running |
 | ! | amber / red | agents needing attention: questions/permissions, or errors |
-| ✓ | blue | agents that finished and were not acknowledged yet |
+| ✓ | green | agents that finished and were not acknowledged yet |
+
+Colors mirror Paseo's own status palette (blue running, green done, amber needs-input, red failed).
 
 **Press the key** to acknowledge finished/error agents (clears their attention flag in Paseo) and open or focus the Paseo desktop app.
 
