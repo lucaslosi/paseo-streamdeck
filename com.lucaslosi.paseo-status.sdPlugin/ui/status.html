@@ -6,21 +6,13 @@
 		<script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
 	</head>
 	<body>
-		<sdpi-item label="Daemon URL">
-			<sdpi-textfield
-				setting="daemonUrl"
+		<sdpi-item label="Daemons">
+			<sdpi-textarea
+				setting="daemons"
 				global
-				placeholder="ws://127.0.0.1:6767/ws"
-				defaultvalue="ws://127.0.0.1:6767/ws"
-			></sdpi-textfield>
-		</sdpi-item>
-		<sdpi-item label="Password">
-			<sdpi-textfield
-				setting="daemonPassword"
-				global
-				type="password"
-				placeholder="optional daemon password"
-			></sdpi-textfield>
+				rows="4"
+				placeholder="ws://127.0.0.1:6767/ws&#10;Homelab | ws://192.168.0.138:6767/ws&#10;Label | url | password"
+			></sdpi-textarea>
 		</sdpi-item>
 		<sdpi-item label="Paseo app">
 			<sdpi-textfield
