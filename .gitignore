@@ -1,0 +1,5 @@
+node_modules/
+*.streamDeckPlugin
+com.lucaslosi.paseo-status.sdPlugin/bin/
+*.log
+.DS_Store

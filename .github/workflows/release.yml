@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx streamdeck validate com.lucaslosi.paseo-status.sdPlugin
+      - run: npx streamdeck pack com.lucaslosi.paseo-status.sdPlugin -f
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: com.lucaslosi.paseo-status.streamDeckPlugin
+          path: com.lucaslosi.paseo-status.streamDeckPlugin
+
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: com.lucaslosi.paseo-status.streamDeckPlugin

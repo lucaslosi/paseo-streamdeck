@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+	<head lang="en">
+		<title>Paseo Status</title>
+		<meta charset="utf-8" />
+		<script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+	</head>
+	<body>
+		<sdpi-item label="Daemon URL">
+			<sdpi-textfield
+				setting="daemonUrl"
+				global
+				placeholder="ws://127.0.0.1:6767/ws"
+				defaultvalue="ws://127.0.0.1:6767/ws"
+			></sdpi-textfield>
+		</sdpi-item>
+		<sdpi-item label="Password">
+			<sdpi-textfield
+				setting="daemonPassword"
+				global
+				type="password"
+				placeholder="optional daemon password"
+			></sdpi-textfield>
+		</sdpi-item>
+		<sdpi-item label="Paseo app">
+			<sdpi-textfield
+				setting="paseoPath"
+				global
+				placeholder="auto-detect"
+			></sdpi-textfield>
+		</sdpi-item>
+	</body>
+</html>
