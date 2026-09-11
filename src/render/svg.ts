@@ -51,6 +51,11 @@ function renderConnected(status: PaseoStatus): string {
 		`<clipPath id="card"><rect x="${CARD.x}" y="${CARD.y}" width="${CARD.size}" height="${CARD.size}" rx="${CARD.radius}"/></clipPath>` +
 		`<linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.07"/><stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/></linearGradient>`;
 
+	const unreachableDot =
+		status.unreachable > 0
+			? `<circle cx="8" cy="64.5" r="2.2" fill="${COLORS.attention}"/>`
+			: "";
+
 	return wrap(
 		`<defs>${defs}</defs>` +
 			`<g clip-path="url(#card)">` +
@@ -59,6 +64,7 @@ function renderConnected(status: PaseoStatus): string {
 			`<rect x="${CARD.x}" y="${CARD.y + BAND_HEIGHT}" width="${CARD.size}" height="1" fill="#000000" fill-opacity="0.35"/>` +
 			`<rect x="${CARD.x}" y="${CARD.y + BAND_HEIGHT * 2}" width="${CARD.size}" height="1" fill="#000000" fill-opacity="0.35"/>` +
 			`<rect x="${CARD.x}" y="${CARD.y}" width="${CARD.size}" height="${CARD.size}" fill="url(#sheen)"/>` +
+			unreachableDot +
 			`</g>` +
 			`<rect x="${CARD.x}" y="${CARD.y}" width="${CARD.size}" height="${CARD.size}" rx="${CARD.radius}" fill="none" stroke="${borderColor}" stroke-width="1.6"/>`,
 	);

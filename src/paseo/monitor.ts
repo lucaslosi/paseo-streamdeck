@@ -2,14 +2,14 @@ import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { WebSocketLike } from "@getpaseo/client/internal/daemon-client-transport-types";
 import type { ConnectionState, PaseoAgent } from "@getpaseo/client";
 import WebSocket from "ws";
+import { parseDaemons, type DaemonTarget } from "./daemons.js";
 import { deriveStatus, type ConnectionStatus, type PaseoStatus } from "./state.js";
-
-export const DEFAULT_DAEMON_URL = "ws://127.0.0.1:6767/ws";
 
 const EMIT_DEBOUNCE_MS = 80;
 const RESYNC_INTERVAL_MS = 60_000;
 
 export interface MonitorSettings {
+	daemons?: string;
 	daemonUrl?: string;
 	daemonPassword?: string;
 }
@@ -28,16 +28,22 @@ const silentLogger: MonitorLogger = {
 	error: () => {},
 };
 
+interface DaemonConnection {
+	target: DaemonTarget;
+	client: DaemonClient;
+	agents: Map<string, PaseoAgent>;
+	state: ConnectionStatus;
+	closed: boolean;
+}
+
 export class PaseoMonitor {
-	private client: DaemonClient | null = null;
-	private agents = new Map<string, PaseoAgent>();
-	private connection: ConnectionStatus = "offline";
-	private settings: MonitorSettings = {};
+	private connections = new Map<string, DaemonConnection>();
+	private settingsKey = "";
+	private running = false;
 	private logger: MonitorLogger = silentLogger;
 	private readonly listeners = new Set<(status: PaseoStatus) => void>();
 	private resyncTimer: ReturnType<typeof setInterval> | null = null;
 	private emitTimer: ReturnType<typeof setTimeout> | null = null;
-	private running = false;
 
 	onChange(listener: (status: PaseoStatus) => void): () => void {
 		this.listeners.add(listener);
@@ -45,7 +51,29 @@ export class PaseoMonitor {
 	}
 
 	getStatus(): PaseoStatus {
-		return deriveStatus(this.agents.values(), this.connection);
+		const agents = new Map<string, PaseoAgent>();
+		let connected = 0;
+		let connecting = 0;
+		let unreachable = 0;
+
+		for (const connection of this.connections.values()) {
+			if (connection.state === "connected") {
+				connected++;
+			} else if (connection.state === "connecting") {
+				connecting++;
+			}
+
+			if (connection.state !== "connected") {
+				unreachable++;
+			}
+
+			for (const agent of connection.agents.values()) {
+				agents.set(agent.id, agent);
+			}
+		}
+
+		const connection: ConnectionStatus = connected > 0 ? "connected" : connecting > 0 ? "connecting" : "offline";
+		return deriveStatus(agents.values(), connection, unreachable);
 	}
 
 	start(settings: MonitorSettings, logger: MonitorLogger = silentLogger): void {
@@ -60,68 +88,70 @@ export class PaseoMonitor {
 
 	stop(): void {
 		this.running = false;
-		this.stopResync();
-		const client = this.client;
-		this.client = null;
-		if (client) void client.close();
+		void this.disconnectAll();
 	}
 
 	/** Clears Paseo's attention flag for finished/failed agents (not pending questions). */
 	async acknowledge(): Promise<void> {
-		const client = this.client;
-		if (!client || this.connection !== "connected") {
-			return;
-		}
+		for (const connection of this.connections.values()) {
+			if (connection.state !== "connected") {
+				continue;
+			}
 
-		const ids = [...this.agents.values()]
-			.filter((agent) => agent.requiresAttention && agent.attentionReason !== "permission")
-			.map((agent) => agent.id);
+			const ids = [...connection.agents.values()]
+				.filter((agent) => agent.requiresAttention && agent.attentionReason !== "permission")
+				.map((agent) => agent.id);
 
-		if (ids.length === 0) {
-			return;
-		}
+			if (ids.length === 0) {
+				continue;
+			}
 
-		try {
-			await client.clearAgentAttention(ids);
-			this.logger.debug("cleared agent attention", { count: ids.length });
-		} catch (error) {
-			this.logger.warn("failed to clear agent attention", { error: String(error) });
+			try {
+				await connection.client.clearAgentAttention(ids);
+				this.logger.debug("cleared agent attention", { url: connection.target.url, count: ids.length });
+			} catch (error) {
+				this.logger.warn("failed to clear agent attention", {
+					url: connection.target.url,
+					error: String(error),
+				});
+			}
 		}
 	}
 
 	private async applySettings(settings: MonitorSettings): Promise<void> {
-		const nextUrl = settings.daemonUrl?.trim() || DEFAULT_DAEMON_URL;
-		const nextPassword = settings.daemonPassword?.trim() || undefined;
-		const changed = nextUrl !== this.currentUrl || nextPassword !== this.currentPassword;
-		this.settings = { ...settings, daemonUrl: nextUrl, daemonPassword: nextPassword };
+		const targets = parseDaemons(settings);
+		const key = JSON.stringify(targets.map((target) => [target.url, target.password ?? ""]));
 
-		if (!changed && this.client) {
+		if (key === this.settingsKey && this.connections.size > 0) {
 			return;
 		}
-
-		this.currentUrl = nextUrl;
-		this.currentPassword = nextPassword;
+		this.settingsKey = key;
 
 		if (!this.running) {
 			return;
 		}
 
-		await this.disconnect();
-		this.connect();
+		await this.disconnectAll();
+		if (!this.running) {
+			return;
+		}
+
+		for (const target of targets) {
+			this.connectTarget(target);
+		}
+		this.startResync();
+		this.scheduleEmit();
 	}
 
-	private currentUrl = DEFAULT_DAEMON_URL;
-	private currentPassword: string | undefined;
-
-	private async disconnect(): Promise<void> {
+	private async disconnectAll(): Promise<void> {
 		this.stopResync();
-		const client = this.client;
-		this.client = null;
-		this.agents = new Map();
-		this.connection = "offline";
-		if (client) {
+		const connections = [...this.connections.values()];
+		this.connections = new Map();
+
+		for (const connection of connections) {
+			connection.closed = true;
 			try {
-				await client.close();
+				await connection.client.close();
 			} catch {
 				// already closed
 			}
@@ -129,16 +159,15 @@ export class PaseoMonitor {
 		this.scheduleEmit();
 	}
 
-	private connect(): void {
-		const url = this.currentUrl;
-		this.logger.info("connecting to Paseo daemon", { url });
+	private connectTarget(target: DaemonTarget): void {
+		this.logger.info("connecting to Paseo daemon", { url: target.url });
 
 		const client = new DaemonClient({
-			url,
+			url: target.url,
 			clientId: `paseo-streamdeck-${Math.random().toString(36).slice(2, 10)}`,
 			clientType: "browser",
-			appVersion: "0.1.0",
-			password: this.currentPassword,
+			appVersion: "0.2.0",
+			password: target.password,
 			webSocketFactory: (url) => new WebSocket(url) as unknown as WebSocketLike,
 			reconnect: { enabled: true, baseDelayMs: 1_000, maxDelayMs: 15_000 },
 			logger: {
@@ -149,61 +178,52 @@ export class PaseoMonitor {
 			},
 		});
 
-		this.client = client;
+		const connection: DaemonConnection = {
+			target,
+			client,
+			agents: new Map(),
+			state: "connecting",
+			closed: false,
+		};
+		this.connections.set(target.url, connection);
 
 		client.subscribeConnectionStatus((state) => {
-			if (client !== this.client) {
+			if (connection.closed) {
 				return;
 			}
-			this.handleConnectionState(state);
+			connection.state = toConnectionStatus(state);
+			if (connection.state === "connected") {
+				void this.sync(connection);
+			}
+			this.scheduleEmit();
 		});
 
 		client.on("agent_update", (message) => {
-			if (client !== this.client) {
+			if (connection.closed) {
 				return;
 			}
 			if (message.payload.kind === "upsert") {
-				this.agents.set(message.payload.agent.id, message.payload.agent);
+				connection.agents.set(message.payload.agent.id, message.payload.agent);
 			} else {
-				this.agents.delete(message.payload.agentId);
+				connection.agents.delete(message.payload.agentId);
 			}
 			this.scheduleEmit();
 		});
 
 		client.connect().catch((error) => {
-			this.logger.warn("daemon connection failed", { url, error: String(error) });
+			this.logger.warn("daemon connection failed", { url: target.url, error: String(error) });
 		});
 	}
 
-	private handleConnectionState(state: ConnectionState): void {
-		if (state.status === "connected") {
-			this.connection = "connected";
-			this.startResync();
-			void this.sync();
-		} else if (state.status === "connecting") {
-			this.connection = "connecting";
-			this.stopResync();
-		} else {
-			this.connection = "offline";
-			this.stopResync();
-		}
-		this.scheduleEmit();
-	}
-
-	private async sync(): Promise<void> {
-		const client = this.client;
-		if (!client) {
-			return;
-		}
-
+	private async sync(connection: DaemonConnection): Promise<void> {
 		try {
-			const result = await client.fetchAgents({
+			const result = await connection.client.fetchAgents({
 				scope: "active",
 				filter: { includeArchived: false },
 				subscribe: {},
 			});
 
-			if (client !== this.client) {
+			if (connection.closed) {
 				return;
 			}
 
@@ -211,16 +231,22 @@ export class PaseoMonitor {
 			for (const entry of result.entries) {
 				next.set(entry.agent.id, entry.agent);
 			}
-			this.agents = next;
+			connection.agents = next;
 			this.scheduleEmit();
 		} catch (error) {
-			this.logger.warn("failed to fetch agents", { error: String(error) });
+			this.logger.warn("failed to fetch agents", { url: connection.target.url, error: String(error) });
 		}
 	}
 
 	private startResync(): void {
 		this.stopResync();
-		this.resyncTimer = setInterval(() => void this.sync(), RESYNC_INTERVAL_MS);
+		this.resyncTimer = setInterval(() => {
+			for (const connection of this.connections.values()) {
+				if (connection.state === "connected") {
+					void this.sync(connection);
+				}
+			}
+		}, RESYNC_INTERVAL_MS);
 	}
 
 	private stopResync(): void {
@@ -242,6 +268,16 @@ export class PaseoMonitor {
 			}
 		}, EMIT_DEBOUNCE_MS);
 	}
+}
+
+function toConnectionStatus(state: ConnectionState): ConnectionStatus {
+	if (state.status === "connected") {
+		return "connected";
+	}
+	if (state.status === "connecting") {
+		return "connecting";
+	}
+	return "offline";
 }
 
 export const monitor = new PaseoMonitor();

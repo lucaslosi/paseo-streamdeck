@@ -6,7 +6,7 @@ import streamDeck, {
 	type WillAppearEvent,
 	type WillDisappearEvent,
 } from "@elgato/streamdeck";
-import { openPaseo } from "../paseo/open.js";
+import { focusOrLaunchPaseo } from "../paseo/open.js";
 import { monitor } from "../paseo/monitor.js";
 import type { PaseoStatus } from "../paseo/state.js";
 import { renderStatusImage } from "../render/svg.js";
@@ -29,7 +29,7 @@ export class StatusKeyAction extends SingletonAction {
 	override async onKeyDown(_ev: KeyDownEvent): Promise<void> {
 		await monitor.acknowledge();
 		await this.renderAll(monitor.getStatus());
-		openPaseo(getGlobalSettings().paseoPath);
+		focusOrLaunchPaseo(getGlobalSettings().paseoPath);
 	}
 
 	async renderAll(status: PaseoStatus): Promise<void> {

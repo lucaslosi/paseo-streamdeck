@@ -3,7 +3,7 @@ import type { PaseoAgent } from "@getpaseo/client";
 export type ConnectionStatus = "connected" | "connecting" | "offline";
 
 export interface PaseoStatus {
-	/** Daemon connection state. */
+	/** Combined daemon connection state. */
 	connection: ConnectionStatus;
 	/** Agents with a turn in flight. */
 	running: number;
@@ -15,19 +15,21 @@ export interface PaseoStatus {
 	done: number;
 	/** needsInput + failed. */
 	attention: number;
-	/** Total agents in the active scope. */
+	/** Total agents across all reachable daemons. */
 	total: number;
+	/** Configured daemons that are not currently connected. */
+	unreachable: number;
 }
 
-export function emptyStatus(connection: ConnectionStatus = "offline"): PaseoStatus {
-	return { connection, running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0 };
+export function emptyStatus(connection: ConnectionStatus = "offline", unreachable = 0): PaseoStatus {
+	return { connection, running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0, unreachable };
 }
 
 /**
  * Mirrors Paseo's own state-bucket precedence:
  * needs_input > failed > running > attention (done) > idle.
  */
-export function deriveStatus(agents: Iterable<PaseoAgent>, connection: ConnectionStatus): PaseoStatus {
+export function deriveStatus(agents: Iterable<PaseoAgent>, connection: ConnectionStatus, unreachable = 0): PaseoStatus {
 	let running = 0;
 	let needsInput = 0;
 	let failed = 0;
@@ -65,5 +67,6 @@ export function deriveStatus(agents: Iterable<PaseoAgent>, connection: Connectio
 		done,
 		attention: needsInput + failed,
 		total,
+		unreachable,
 	};
 }

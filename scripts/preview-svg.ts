@@ -9,20 +9,27 @@ mkdirSync(outDir, { recursive: true });
 const cases: Array<{ name: string; status: PaseoStatus }> = [
 	{
 		name: "connected",
-		status: { connection: "connected", running: 2, needsInput: 1, failed: 0, done: 3, attention: 1, total: 6 },
+		status: { connection: "connected", running: 2, needsInput: 1, failed: 0, done: 3, attention: 1, total: 6, unreachable: 0 },
+	},
+	{
+		name: "partial",
+		status: { connection: "connected", running: 2, needsInput: 0, failed: 0, done: 1, attention: 0, total: 3, unreachable: 1 },
 	},
 	{
 		name: "failed",
-		status: { connection: "connected", running: 0, needsInput: 0, failed: 2, done: 0, attention: 2, total: 2 },
+		status: { connection: "connected", running: 0, needsInput: 0, failed: 2, done: 0, attention: 2, total: 2, unreachable: 0 },
 	},
 	{
 		name: "empty",
-		status: { connection: "connected", running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0 },
+		status: { connection: "connected", running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0, unreachable: 0 },
 	},
-	{ name: "offline", status: { connection: "offline", running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0 } },
+	{
+		name: "offline",
+		status: { connection: "offline", running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0, unreachable: 2 },
+	},
 	{
 		name: "connecting",
-		status: { connection: "connecting", running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0 },
+		status: { connection: "connecting", running: 0, needsInput: 0, failed: 0, done: 0, attention: 0, total: 0, unreachable: 2 },
 	},
 ];
 

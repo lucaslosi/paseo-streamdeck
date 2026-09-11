@@ -18,6 +18,7 @@ setGlobalSettings(settings);
 
 monitor.start(
 	{
+		daemons: settings.daemons,
 		daemonUrl: settings.daemonUrl,
 		daemonPassword: settings.daemonPassword,
 	},
@@ -33,6 +34,7 @@ streamDeck.settings.onDidReceiveGlobalSettings((ev) => {
 	const next = ev.settings as GlobalSettings;
 	setGlobalSettings(next);
 	monitor.updateSettings({
+		daemons: next.daemons,
 		daemonUrl: next.daemonUrl,
 		daemonPassword: next.daemonPassword,
 	});
